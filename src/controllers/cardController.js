@@ -26,6 +26,7 @@ export const getRetryCards = async (req, res) => {
   try {
     const { deck = 'japanese' } = req.query;
     const currentUserId = req.user._id;
+    
     const cards = await cardService.getRetryCards(deck, currentUserId);
     res.json(cards);
   } catch (error) {
