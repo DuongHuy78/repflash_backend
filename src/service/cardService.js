@@ -1,11 +1,14 @@
 import Flashcard from '../models/Flashcard.js';
 import { updateStreak } from './userService.js';
+import { getDayRangeInTimeZone } from '../utils/utlils.js';
+import User from '../models/User.js';
 
 const MASTERED_INTERVAL_DAYS = 7;
 
-const clearExpiredSameDayRetries = async (startOfDay) => {
+const clearExpiredSameDayRetries = async (startOfDay, userId) => {
   await Flashcard.updateMany(
     {
+      userId: userId,
       status: 'learning',
       sameDayRetry: true,
       lastReviewedAt: { $lt: startOfDay },
@@ -18,6 +21,14 @@ const clearExpiredSameDayRetries = async (startOfDay) => {
       },
     }
   );
+};
+
+const getUserTimezone = async (userId) => {
+  const user = await User.findById(userId).select('timezone');
+  if (!user) {
+    throw new Error('Không tìm thấy người dùng');
+  }
+  return user.timezone || 'Asia/Ho_Chi_Minh';
 };
 
 export const getAllCards = async (filters, currentUserId) => {
@@ -70,9 +81,10 @@ export const getAllCards = async (filters, currentUserId) => {
   };
 };
 
-export const getDueCards = async (deck, currentUserId, timeZone) => {
+export const getDueCards = async (deck, currentUserId) => {
+  const timeZone = await getUserTimezone(currentUserId);
   const { startOfDay, endOfDay } = getDayRangeInTimeZone(new Date, timeZone);
-  await clearExpiredSameDayRetries(startOfDay);
+  await clearExpiredSameDayRetries(startOfDay, currentUserId);
 
   const cards = await Flashcard.find({
     userId: currentUserId,
@@ -86,8 +98,9 @@ export const getDueCards = async (deck, currentUserId, timeZone) => {
 };
 
 export const getRetryCards = async (deck, currentUserId) => {
+  const timeZone = await getUserTimezone(currentUserId);
   const { startOfDay } = getDayRangeInTimeZone(new Date, timeZone);
-  await clearExpiredSameDayRetries(startOfDay);
+  await clearExpiredSameDayRetries(startOfDay, currentUserId);
 
   const cards = await Flashcard.find({
     userId: currentUserId,
