@@ -47,7 +47,20 @@ const userSchema = new mongoose.Schema({
   },
   unlockedMilestones: {
     type: [Number], default: []
-  }
+  },
+  passwordResetTokenHash: {
+    type: String,
+    select: false,
+    default: null,
+  },
+  passwordResetExpiresAt: {
+    type: Date,
+    default: null,
+  },
+  tokenVersion: {
+    type: Number,
+    default: 0,
+  },
 }, { timestamps: true }); // timestamps: true sẽ tự động tạo ra 2 trường 'createdAt' và 'updatedAt'
 
 export default mongoose.model('User', userSchema);

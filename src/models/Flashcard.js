@@ -34,7 +34,8 @@ const flashcardSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'learning', 'mastered'], // active thẻ bth ko phải AGAIN, learning đã bấm học lại mastered là đã thuộc
+    // active thẻ bth ko phải AGAIN, learning đã bấm học lại mastered là đã thuộc, new là thẻ mới chưa học
+    enum: ['active', 'learning', 'mastered'], 
     default: 'active',
   },
   masteredAt: {
@@ -59,6 +60,6 @@ flashcardSchema.index({ status: 1, nextReview: 1 });
 flashcardSchema.index({ status: 1 });
 flashcardSchema.index({ nextReview: 1 });
 flashcardSchema.index({ lastReviewedAt: 1 });
-flashcardSchema.index({ deck: 1 });
+flashcardSchema.index({ deckId: 1 });
 
 export default mongoose.model('Flashcard', flashcardSchema);

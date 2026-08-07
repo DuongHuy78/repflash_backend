@@ -99,3 +99,11 @@ export const getDayRangeInTimeZone = (date = new Date(), timeZone = 'Asia/Ho_Chi
     endOfDay: new Date(startOfTomorrow.getTime() - 1),
   };
 };
+
+
+export const isPasswordValiable = (passWord) => {
+  if (typeof passWord !== 'string' || passWord.length < 8) {
+    return false;
+  }
+  return true;
+}

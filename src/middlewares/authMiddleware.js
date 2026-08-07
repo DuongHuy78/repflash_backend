@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
+import User from '../models/User.js';
 
-export const verifyToken = (req, res, next) => {
+export const verifyToken = async (req, res, next) => {
     // 1. Lấy chuỗi Token từ Header của Request (Frontend sẽ gửi kèm chữ 'Bearer ')
     const authHeader = req.headers.authorization;
     
@@ -15,11 +16,24 @@ export const verifyToken = (req, res, next) => {
         // 2. Dùng jwt để giải mã token xem có hợp lệ/hết hạn chưa
         // Cần truyền vào chữ ký bí mật giống hệt lúc tạo token
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        
-        // 3. Nếu token xịn, lưu thông tin user (đã giải mã) vào req để các file khác dùng
+
+        const user = await User.findById(decoded._id).select('tokenVersion');
+
+        if (!user) {
+        return res.status(401).json({
+            message: 'Tài khoản không còn tồn tại.',
+        });
+        }
+        // 3. Nếu version token thay đổi thi bắt người dùng đăng nhập lại
+        if ((decoded.tokenVersion ?? 0) !== (user.tokenVersion ?? 0)) {
+        return res.status(401).json({
+            message: 'Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại.',
+        });
+        }
+        // 4. Nếu token xịn, lưu thông tin user (đã giải mã) vào req để các file khác dùng
         req.user = decoded;
         
-        // 4. BẤM NÚT MỞ CỔNG cho Request đi tiếp vào Controller
+        // 5. BẤM NÚT MỞ CỔNG cho Request đi tiếp vào Controller
         next(); 
     } catch (error) {
         return res.status(403).json({ message: "Token không hợp lệ hoặc đã hết hạn!" });
