@@ -72,3 +72,25 @@ export const resetPassword = async (req, res) => {
         console.log(error.message);
     }
 }
+
+export const updateProfile = async (req, res) => {
+    try {
+        const { username, email } = req.body;
+        if(username == "" || email == "" ) {
+            throw new Error("Thông tin cập nhật không đầy đủ");
+        }
+
+        const userId = req.user._id;
+        const result = await userService.updateProfile(
+            req.user._id,
+            { username, email }
+        );
+        res.status(200).json({
+            message: "Cập nhật thông tin thành công",
+            user: result,
+        })
+    } catch (error) {
+         res.status(400).json('Không thể cập nhật thông tin cá nhân. Vui lòng thử lại sau.');
+        console.log(error.message);
+    }
+}

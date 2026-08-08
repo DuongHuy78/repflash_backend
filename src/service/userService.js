@@ -167,6 +167,53 @@ export const getProfile = async (userId) => {
   return user;
 };
 
+export const updateProfile = async (userId, updateData) => {
+
+  const username = updateData.username?.trim();
+  const email = updateData.email?.trim().toLowerCase();
+
+
+
+  const user = await User.findById(userId);
+
+  if(!user) {
+    throw new Error("Tài khoản không tồn tại");
+  }
+
+  if(await User.findOne({
+    email: email,
+    _id: { $ne: userId },
+  })) {
+    throw new Error("Email đã tồn tại");
+  }
+
+  if(await User.findOne({
+    username: username,
+    _id: { $ne: userId },
+  })) {
+    throw new Error("Username đã tồn tại");
+  }
+
+  user.username = username;
+  user.email = email;
+
+  try {
+    await user.save();
+  } catch (error) {
+    if (error.code === 11000) {
+      throw new Error("Username hoặc email đã tồn tại");
+    }
+    throw error;
+  }
+  return {
+    _id: user._id,
+    username: user.username,
+    email: user.email,
+    timezone: user.timezone,
+    updatedAt: user.updatedAt,
+  };
+}
+
 const createPasswordResetToken = () => {
   // Mỗi byte được biểu diễn bằng hai ký tự hex để dùng an toàn trong URL.
   const rawToken = crypto.randomBytes(32).toString('hex');
@@ -230,7 +277,6 @@ export const requestPasswordReset = async (email) => {
   }
 
 };
-
 
 export const resetPassword = async (rawToken, newPassword) => {
   const tokenHash = crypto
