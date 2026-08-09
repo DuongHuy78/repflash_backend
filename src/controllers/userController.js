@@ -90,7 +90,34 @@ export const updateProfile = async (req, res) => {
             user: result,
         })
     } catch (error) {
-         res.status(400).json('Không thể cập nhật thông tin cá nhân. Vui lòng thử lại sau.');
+        res.status(400).json('Không thể cập nhật thông tin cá nhân. Vui lòng thử lại sau.');
+        console.log(error.message);
+    }
+}
+
+export const updatePassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+
+        if (
+            typeof currentPassword !== 'string' || !currentPassword ||
+            typeof newPassword !== 'string' || !newPassword
+        ) {
+            return res.status(400).json({
+                message: 'Vui lòng nhập đầy đủ mật khẩu hiện tại và mật khẩu mới.',
+            });
+        }
+
+        await userService.updatePassword(
+            req.user._id,
+            currentPassword,
+            newPassword
+        );
+        return res.status(200).json({
+            message: 'Cập nhật mật khẩu thành công. Hãy đăng nhập lại.',
+        });
+    } catch (error) {
+        res.status(400).json({ message: error.message });
         console.log(error.message);
     }
 }

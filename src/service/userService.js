@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
-import { getLocalDateString, getDaysDifference } from '../utils/utlils.js';
+import { getLocalDateString, getDaysDifference, isPasswordValiable } from '../utils/utlils.js';
 
 const RESET_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 phút
 
@@ -25,7 +25,7 @@ const createMailTransporter = () => {
 export const signIn = async (username, password, timezone) => {
     // 1. Kiểm tra dữ liệu đầu vào
     if (!username || !password) {
-        throw new Error('Vui lòng nhập đầy đủ tài khoản và mật khẩu');
+        throw new Error('Vui lòng nhập đầy đủ tài khoản và mật khẩu!');
     }
 
     // 2. Tìm kiếm User trong Database
@@ -33,13 +33,13 @@ export const signIn = async (username, password, timezone) => {
 
     // 3. Nếu không tìm thấy User
     if (!user) {
-        throw new Error('Tài khoản không tồn tại');
+        throw new Error('Tài khoản không tồn tại!');
     }
 
     // 4. So sánh mật khẩu
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-        throw new Error('Mật khẩu không chính xác');
+        throw new Error('Mật khẩu không chính xác!');
     }
 
     // 5. (Tùy chọn) Cập nhật thời gian lần cuối đăng nhập
@@ -64,7 +64,7 @@ export const signIn = async (username, password, timezone) => {
 
 export const signUp = async (username, password, email, timezone) => {
     if (!username || !password || !email ) {
-        throw new Error('Vui lòng nhập đầy đủ thông tin');
+        throw new Error('Vui lòng nhập đầy đủ thông tin!');
     }
 
     // LƯU Ý: Phải có chữ 'await' vì tìm kiếm trong Database cần thời gian chờ (bất đồng bộ)
@@ -172,26 +172,24 @@ export const updateProfile = async (userId, updateData) => {
   const username = updateData.username?.trim();
   const email = updateData.email?.trim().toLowerCase();
 
-
-
   const user = await User.findById(userId);
 
   if(!user) {
-    throw new Error("Tài khoản không tồn tại");
+    throw new Error("Tài khoản không tồn tại!");
   }
 
   if(await User.findOne({
     email: email,
     _id: { $ne: userId },
   })) {
-    throw new Error("Email đã tồn tại");
+    throw new Error("Email đã tồn tại!");
   }
 
   if(await User.findOne({
     username: username,
     _id: { $ne: userId },
   })) {
-    throw new Error("Username đã tồn tại");
+    throw new Error("Username đã tồn tại!");
   }
 
   user.username = username;
@@ -201,7 +199,7 @@ export const updateProfile = async (userId, updateData) => {
     await user.save();
   } catch (error) {
     if (error.code === 11000) {
-      throw new Error("Username hoặc email đã tồn tại");
+      throw new Error("Username hoặc email đã tồn tại!");
     }
     throw error;
   }
@@ -213,6 +211,49 @@ export const updateProfile = async (userId, updateData) => {
     updatedAt: user.updatedAt,
   };
 }
+
+export const updatePassword = async (userId, currentPassword, newPassword) => {
+  if (typeof currentPassword !== 'string' || !currentPassword) {
+    throw new Error('Vui lòng nhập mật khẩu hiện tại.');
+  }
+
+  if (!isPasswordValiable(newPassword)) {
+    throw new Error('Mật khẩu mới phải có ít nhất 8 ký tự.');
+  }
+
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new Error('Tài khoản không tồn tại.');
+  }
+
+  const isCurrentPasswordCorrect = await bcrypt.compare(currentPassword, user.password);
+  if (!isCurrentPasswordCorrect) {
+    throw new Error('Mật khẩu hiện tại không đúng.');
+  }
+
+  const isReusingCurrentPassword = await bcrypt.compare(newPassword, user.password);
+  if (isReusingCurrentPassword) {
+    throw new Error('Mật khẩu mới phải khác mật khẩu hiện tại.');
+  }
+
+  const hashedPassword = await bcrypt.hash(
+    newPassword,
+    Number(process.env.SALT_ROUNDS)
+  );
+
+  user.password = hashedPassword;
+  user.passwordResetExpiresAt = null;
+  user.passwordResetTokenHash = null;
+  user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+
+  try {
+    await user.save();
+  } catch (error) {
+    console.log('UserService: Cập nhật password lỗi', error.message);
+    throw new Error('Không thể cập nhật mật khẩu. Vui lòng thử lại.');
+  }
+};
 
 const createPasswordResetToken = () => {
   // Mỗi byte được biểu diễn bằng hai ký tự hex để dùng an toàn trong URL.
