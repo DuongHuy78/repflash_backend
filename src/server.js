@@ -27,6 +27,13 @@ app.use('/api/cards', cardRouter);
 app.use('/api/user', userRouter);
 app.use('/api/decks', deckRouter);
 
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Phục vụ các file tĩnh của Frontend (từ thư mục dist)
 const frontendPath = path.resolve(__dirname, '../../frontend/dist');
 app.use(express.static(frontendPath));
