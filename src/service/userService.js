@@ -2,25 +2,50 @@ import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import nodemailer from 'nodemailer';
 import { getLocalDateString, getDaysDifference, isPasswordValiable } from '../utils/utlils.js';
 
 const RESET_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 phút
 
-const createMailTransporter = () => {
-  const smtpPort = Number(process.env.SMTP_PORT || 587);
 
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: smtpPort,
-    secure: smtpPort === 465,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
+const sendPasswordResetEmail = async ({ to, resetUrl }) => {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.MAIL_FROM;
+
+  if (!apiKey || !from) {
+    throw new Error('Thiếu RESEND_API_KEY hoặc MAIL_FROM.');
+  }
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
     },
+    body: JSON.stringify({
+      from,
+      to: [to],
+      subject: 'Đặt lại mật khẩu Flashcard App',
+      text: [
+        'Bạn đã yêu cầu đặt lại mật khẩu Flashcard App.',
+        '',
+        'Mở liên kết sau để tạo mật khẩu mới:',
+        resetUrl,
+        '',
+        'Liên kết có hiệu lực trong 15 phút và chỉ dùng được một lần.',
+        'Nếu không phải bạn yêu cầu, hãy bỏ qua email này.',
+      ].join('\n'),
+    }),
+    signal: AbortSignal.timeout(10000),
   });
-};
 
+  if (!response.ok) {
+    const detail = await response.text();
+    const error = new Error(`Resend HTTP ${response.status}`);
+    error.code = response.status;
+    error.responseBody = detail;
+    throw error;
+  }
+};
 
 export const signIn = async (username, password, timezone) => {
     // 1. Kiểm tra dữ liệu đầu vào
@@ -318,28 +343,16 @@ export const requestPasswordReset = async (email) => {
     encodeURIComponent(rawToken);
 
   try {
-    await createMailTransporter().sendMail({
-      from: process.env.MAIL_FROM,
+    await sendPasswordResetEmail({
       to: user.email,
-      subject: 'Đặt lại mật khẩu Flashcard App',
-      text: [
-        'Bạn đã yêu cầu đặt lại mật khẩu Flashcard App.',
-        '',
-        'Mở liên kết sau để tạo mật khẩu mới:',
-        resetUrl,
-        '',
-        'Liên kết có hiệu lực trong 15 phút và chỉ dùng được một lần.',
-        'Nếu không phải bạn yêu cầu, hãy bỏ qua email này.',
-      ].join('\n'),
+      resetUrl,
     });
   } catch (error) {
-    // User không nhận được email thì token vừa tạo cũng không nên còn hiệu lực.
-    console.error('SMTP reset email failed:', {
+    console.error('Reset email failed:', {
       name: error.name,
       code: error.code,
-      responseCode: error.responseCode,
-      command: error.command,
       message: error.message,
+      responseBody: error.responseBody,
     });
     user.passwordResetTokenHash = null;
     user.passwordResetExpiresAt = null;
