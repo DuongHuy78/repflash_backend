@@ -100,10 +100,123 @@ export const getDayRangeInTimeZone = (date = new Date(), timeZone = 'Asia/Ho_Chi
   };
 };
 
-
 export const isPasswordValiable = (passWord) => {
   if (typeof passWord !== 'string' || passWord.length < 8) {
     return false;
   }
   return true;
 }
+
+const normalizeRequiredString = (value, fieldName) => {
+  if (typeof value !== 'string') {
+    throw new Error(`${fieldName} phải là chuỗi`);
+  }
+
+  const normalizedValue = value.trim();
+
+  if (!normalizedValue) {
+    throw new Error(`${fieldName} không được để trống`);
+  }
+
+  return normalizedValue;
+};
+
+const normalizeOptionalString = (value, fieldName) => {
+  if (value === undefined) return '';
+
+  if (typeof value !== 'string') {
+    throw new Error(`${fieldName} phải là chuỗi`);
+  }
+
+  return value.trim();
+};
+
+//partial = false → đây là dữ liệu đầy đủ để tạo thẻ
+//partial = true  → đây chỉ là một phần dữ liệu cần cập nhật
+export const normalizeCardContent = (
+  data,
+  { partial = false } = {},
+) => {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error('Dữ liệu thẻ không hợp lệ');
+  }
+
+  const normalized = {};
+
+  if (!partial || data.front !== undefined) {
+    normalized.front = normalizeRequiredString(
+      data.front,
+      'Mặt trước',
+    );
+  }
+
+  if (!partial || data.back !== undefined) {
+    normalized.back = normalizeRequiredString(
+      data.back,
+      'Mặt sau',
+    );
+  }
+
+  if (!partial || data.pronunciation !== undefined) {
+    normalized.pronunciation = normalizeOptionalString(
+      data.pronunciation,
+      'Phiên âm',
+    );
+  }
+
+  if (!partial || data.speechText !== undefined) {
+    normalized.speechText = normalizeOptionalString(
+      data.speechText,
+      'Nội dung phát âm',
+    );
+  }
+
+  if (!partial || data.examples !== undefined) {
+    const examples = data.examples === undefined
+      ? []
+      : data.examples;
+
+    if (!Array.isArray(examples)) {
+      throw new Error('Danh sách ví dụ phải là một mảng');
+    }
+
+    normalized.examples = examples.map((example, index) => {
+      if (
+        !example ||
+        typeof example !== 'object' ||
+        Array.isArray(example)
+      ) {
+        throw new Error(`Ví dụ số ${index + 1} không hợp lệ`);
+      }
+
+      return {
+        text: normalizeRequiredString(
+          example.text,
+          `Nội dung ví dụ số ${index + 1}`,
+        ),
+        translation: normalizeOptionalString(
+          example.translation,
+          `Bản dịch ví dụ số ${index + 1}`,
+        ),
+        ttsText: normalizeOptionalString(
+          example.ttsText,
+          `Nội dung TTS ví dụ số ${index + 1}`,
+        ),
+      };
+    });
+  }
+  return normalized;
+};
+
+
+export const parseValidDate = (value, fieldName) => {
+  if (!value) return null;
+
+  const parsedDate = new Date(value);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    throw new Error(`${fieldName} không hợp lệ`);
+  }
+
+  return parsedDate;
+};

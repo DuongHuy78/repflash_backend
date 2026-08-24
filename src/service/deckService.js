@@ -1,8 +1,16 @@
 import Deck from "../models/Deck.js";
 import Flashcard from "../models/Flashcard.js";
+import mongoose from 'mongoose';
 
 export const createDeck = async (data, currentUserId) => {
     const { deckName, description, language } = data;
+    const normalizedDeckName = deckName?.trim();
+
+    if (!normalizedDeckName) {
+    throw new Error(
+        'Tên học phần không được để trống',
+    );
+    }
     const newDeck = new Deck({ deckName, userId: currentUserId, description, language: language || 'ja-JP' });
     return await newDeck.save();
 }
@@ -25,13 +33,43 @@ export const editDeck = async (deckId, currentUserId, data) => {
     return await deck.save();
 }
 
-export const deleteDeck = async (deckId, currentUserId) => {
-    const deletedDeck = await Deck.findOneAndDelete({ _id: deckId, userId: currentUserId });
-    
-    if (!deletedDeck) throw new Error('Không tìm thấy tập hoặc bạn không có quyền xóa');
+export const deleteDeck = async (
+  deckId,
+  currentUserId,
+) => {
+  return mongoose.connection.transaction(
+    async (session) => {
+      const deck = await Deck.findOne({
+        _id: deckId,
+        userId: currentUserId,
+      }).session(session);
 
-    // Xóa toàn bộ các thẻ thuộc học phần này
-    await Flashcard.deleteMany({ deckId: deckId, userId: currentUserId });
+      if (!deck) {
+        throw new Error(
+          'Không tìm thấy học phần hoặc không có quyền xóa',
+        );
+      }
 
-    return { message: 'Đã xoá học phần và toàn bộ các thẻ liên quan' };
-}
+      await Flashcard.deleteMany(
+        {
+          deckId,
+          userId: currentUserId,
+        },
+        { session },
+      );
+
+      await Deck.deleteOne(
+        {
+          _id: deckId,
+          userId: currentUserId,
+        },
+        { session },
+      );
+
+      return {
+        message:
+          'Đã xóa học phần và toàn bộ thẻ liên quan',
+      };
+    },
+  );
+};

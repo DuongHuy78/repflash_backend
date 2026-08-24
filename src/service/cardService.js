@@ -1,9 +1,46 @@
 import Flashcard from '../models/Flashcard.js';
 import { updateStreak } from './userService.js';
-import { getDayRangeInTimeZone } from '../utils/utlils.js';
+import { getDayRangeInTimeZone, normalizeCardContent, parseValidDate, } from '../utils/utlils.js';
 import User from '../models/User.js';
+import mongoose from 'mongoose';
+import Deck from '../models/Deck.js';
 
+const MAX_BULK_CARDS = 500;
 const MASTERED_INTERVAL_DAYS = 7;
+const ALLOWED_SORT_FIELDS = new Set([
+  'createdAt',
+  'updatedAt',
+  'front',
+  'back',
+  'status',
+  'nextReview',
+]);
+
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const validateDeckAccess = async (
+  deckId,
+  currentUserId,
+) => {
+  if (!deckId) {
+    throw new Error('Hãy chọn học phần');
+  }
+
+  if (!mongoose.isValidObjectId(deckId)) {
+    throw new Error('Mã học phần không hợp lệ');
+  }
+
+  const deckExists = await Deck.exists({
+    _id: deckId,
+    userId: currentUserId,
+  });
+
+  if (!deckExists) {
+    throw new Error(
+      'Không tìm thấy học phần hoặc bạn không có quyền sử dụng học phần này',
+    );
+  }
+};
 
 const clearExpiredSameDayRetries = async (startOfDay, userId) => {
   await Flashcard.updateMany(
@@ -32,10 +69,43 @@ const getUserTimezone = async (userId) => {
 };
 
 export const getAllCards = async (filters, currentUserId) => {
-  const { status, search, dateFrom, dateTo, page = 1, limit = 50, sortBy = 'createdAt', order = 'desc', deck} = filters;
+  const { status, search, dateFrom, dateTo, page = 1, limit = 50, sortBy = 'createdAt', order = 'desc', deckId } = filters;
 
-  // Đổi tên trường thành deckId để khớp với Model Flashcard.js
-  let query = { userId: currentUserId, deckId: deck };
+  const parsedLimit = Number(limit);
+  const parsedPage = Number(page);
+
+  const safePage = Number.isInteger(parsedPage)
+    ? Math.max(1, parsedPage)
+    : 1;
+
+  const safeLimit =
+    Number.isInteger(parsedLimit)
+      ? Math.min(100, Math.max(1, parsedLimit))
+      : 50;
+
+  const safeSortBy = ALLOWED_SORT_FIELDS.has(sortBy)
+  ? sortBy : 'createdAt';
+  let query = { userId: currentUserId, deckId };
+
+  const safeOrder = order === 'asc' ? 1 : -1;
+
+  const parsedDateFrom = parseValidDate(
+    dateFrom,
+    'Ngày bắt đầu',
+  );
+
+  const parsedDateTo = parseValidDate(
+    dateTo,
+    'Ngày kết thúc',
+  );
+
+  if (parsedDateFrom && parsedDateTo) {
+    if (parsedDateFrom > parsedDateTo) {
+      throw new Error(
+        'Ngày bắt đầu không được sau ngày kết thúc',
+      );
+    }
+  }
 
   // 1. Lọc theo trạng thái
   if (status) {
@@ -43,52 +113,61 @@ export const getAllCards = async (filters, currentUserId) => {
   }
 
   // 2. Tìm kiếm theo từ (mặt trước hoặc mặt sau)
-  if (search) {
+  const normalizedSearch = typeof search === 'string'
+    ? search.trim()
+    : '';
+
+  if (normalizedSearch) {
+    const escapedSearch = escapeRegExp(normalizedSearch);
     query.$or = [
-      { front: { $regex: search, $options: 'i' } },
-      { back: { $regex: search, $options: 'i' } }
+      { front: { $regex: escapedSearch, $options: 'i' } },
+      { pronunciation: { $regex: escapedSearch, $options: 'i' } },
+      { back: { $regex: escapedSearch, $options: 'i' } },
+      { 'examples.text': { $regex: escapedSearch, $options: 'i' } },
+      { 'examples.translation': { $regex: escapedSearch, $options: 'i' } },
     ];
   }
 
   // 3. Lọc theo ngày tạo
-  if (dateFrom || dateTo) {
+  if (parsedDateFrom || parsedDateTo) {
     query.createdAt = {};
-    if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
-    if (dateTo) query.createdAt.$lte = new Date(dateTo);
+    if (parsedDateFrom) query.createdAt.$gte = new Date(parsedDateFrom);
+    if (parsedDateTo) query.createdAt.$lte = new Date(parsedDateTo);
   }
 
   // 4. Phân trang
-  const skip = (parseInt(page) - 1) * parseInt(limit);
+  const skip = (safePage - 1) * safeLimit;
 
   // 5. Cấu hình sắp xếp
-  const sortObject = {};
-  sortObject[sortBy] = order === 'asc' ? 1 : -1;
+  const sortObject = {
+    [safeSortBy]: safeOrder,
+  };
 
   // Thực thi query lấy danh sách
   const cards = await Flashcard.find(query)
     .sort(sortObject)
     .skip(skip)
-    .limit(parseInt(limit));
+    .limit(safeLimit);
     
   // Đếm tổng số lượng thẻ
   const totalCards = await Flashcard.countDocuments(query);
 
   return {
     cards,
-    totalPages: Math.ceil(totalCards / limit),
-    currentPage: parseInt(page),
+    totalPages: Math.ceil(totalCards / safeLimit),
+    currentPage: safePage,
     totalCards
   };
 };
 
-export const getDueCards = async (deck, currentUserId) => {
+export const getDueCards = async (deckId, currentUserId) => {
   const timeZone = await getUserTimezone(currentUserId);
   const { startOfDay, endOfDay } = getDayRangeInTimeZone(new Date, timeZone);
   await clearExpiredSameDayRetries(startOfDay, currentUserId);
 
   const cards = await Flashcard.find({
     userId: currentUserId,
-    deckId: deck, // Ánh xạ sang cột deckId
+    deckId: deckId,
     nextReview: { $lte: endOfDay },
     status: { $ne: 'mastered' },
     sameDayRetry: { $ne: true },
@@ -97,14 +176,14 @@ export const getDueCards = async (deck, currentUserId) => {
   return cards;
 };
 
-export const getRetryCards = async (deck, currentUserId) => {
+export const getRetryCards = async (deckId, currentUserId) => {
   const timeZone = await getUserTimezone(currentUserId);
   const { startOfDay } = getDayRangeInTimeZone(new Date, timeZone);
   await clearExpiredSameDayRetries(startOfDay, currentUserId);
 
   const cards = await Flashcard.find({
     userId: currentUserId,
-    deckId: deck, // Ánh xạ sang cột deckId
+    deckId: deckId,
     status: 'learning',
     sameDayRetry: true,
     lastReviewedAt: { $gte: startOfDay },
@@ -114,40 +193,98 @@ export const getRetryCards = async (deck, currentUserId) => {
 };
 
 export const createCard = async (data) => {
-  const { front, back, deck, userId } = data;
-  // Lưu deck vào cột deckId
-  const newCard = new Flashcard({ front, back, deckId: deck, userId });
+  const { front, pronunciation, speechText, back, examples, deckId, userId } = data;
+
+  await validateDeckAccess(deckId, userId);
+  const normalizedContent = normalizeCardContent(
+    { front, pronunciation, speechText, back, examples },
+    { partial: false },
+  );
+
+  const newCard = new Flashcard({
+    ...normalizedContent,
+    deckId,
+    userId,
+  });
   return await newCard.save();
 };
 
 export const editCard = async (id, data, currentUserId) => {
-  const { front, back, status, nextReview, interval, repetition, easeFactor } = data;
+ const { status, nextReview } = data;
 
-  const card = await Flashcard.findOne({ _id: id, userId: currentUserId });
-  if (!card) throw new Error('Không tìm thấy thẻ hoặc bạn không có quyền sửa');
+  const card = await Flashcard.findOne({
+    _id: id,
+    userId: currentUserId,
+  });
 
-  if (front !== undefined) card.front = front;
-  if (back !== undefined) card.back = back;
-  if (status !== undefined) card.status = status;
-  if (nextReview !== undefined) card.nextReview = new Date(nextReview);
-  if (interval !== undefined) card.interval = interval;
-  if (repetition !== undefined) card.repetition = repetition;
-  if (easeFactor !== undefined) card.easeFactor = easeFactor;
-  
+  if (!card) {
+    throw new Error(
+      'Không tìm thấy thẻ hoặc bạn không có quyền sửa',
+    );
+  }
+
+  const contentChanges = normalizeCardContent(
+    data,
+    { partial: true },
+  );
+
+  Object.assign(card, contentChanges);
+
+  if (status !== undefined) {
+    card.status = status;
+  }
+
+  if (nextReview !== undefined) {
+    const parsedNextReview = new Date(nextReview);
+
+    if (Number.isNaN(parsedNextReview.getTime())) {
+      throw new Error('Ngày ôn tiếp theo không hợp lệ');
+    }
+
+    card.nextReview = parsedNextReview;
+  }
+
   if (status === 'mastered' && !card.masteredAt) {
     card.masteredAt = new Date();
   }
-  
+
   return await card.save();
 };
 
-export const createBulkCards = async (cards, deck, currentUserId) => {
+export const createBulkCards = async (cards, deckId, currentUserId) => {
   if (!cards || !Array.isArray(cards) || cards.length === 0) {
     throw new Error('Không có dữ liệu thẻ hợp lệ');
   }
 
-  // Ánh xạ deck vào cột deckId
-  const cardsWithDeck = cards.map(c => ({ ...c, deckId: c.deck || deck, userId: currentUserId }));
+  if (cards.length > MAX_BULK_CARDS) {
+    throw new Error(
+      `Mỗi lần chỉ được nhập tối đa ${MAX_BULK_CARDS} thẻ`,
+    );
+  }
+
+  if (!deckId) {
+    throw new Error('Hãy chọn học phần trước khi nhập thẻ');
+  }
+
+  await validateDeckAccess(deckId, currentUserId);
+
+  // Gắn học phần và chủ sở hữu do server kiểm soát vào từng thẻ.
+  const cardsWithDeck = cards.map((card, index) => {
+    try{
+      const normalizedContent = normalizeCardContent(card);
+
+      return {
+        ...normalizedContent,
+        deckId,
+        userId: currentUserId,
+      };
+    } catch (error) {
+      throw new Error(
+        `Thẻ ở dòng ${index + 1}: ${error.message}`,
+      );
+    }
+  });
+
   const savedCards = await Flashcard.insertMany(cardsWithDeck);
   return { message: `Đã nhập thành công ${savedCards.length} thẻ`, count: savedCards.length };
 };

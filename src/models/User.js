@@ -17,6 +17,7 @@ const userSchema = new mongoose.Schema({
     unique: true,
     trim: true,
     lowercase: true,
+    unique: true,
   },
   status: {
     type: String,

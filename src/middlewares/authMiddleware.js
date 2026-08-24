@@ -17,7 +17,7 @@ export const verifyToken = async (req, res, next) => {
         // Cần truyền vào chữ ký bí mật giống hệt lúc tạo token
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        const user = await User.findById(decoded._id).select('tokenVersion');
+        const user = await User.findById(decoded._id).select('tokenVersion status');
 
         if (!user) {
         return res.status(401).json({
@@ -32,8 +32,16 @@ export const verifyToken = async (req, res, next) => {
         }
         // 4. Nếu token xịn, lưu thông tin user (đã giải mã) vào req để các file khác dùng
         req.user = decoded;
+
+        // 5. Nếu account bị ban thì không được sử dụng
+        if (user.status === 'ban') {
+            return res.status(403).json({ 
+                message: "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên!" 
+            });
+        }
+
         
-        // 5. BẤM NÚT MỞ CỔNG cho Request đi tiếp vào Controller
+        // 6. BẤM NÚT MỞ CỔNG cho Request đi tiếp vào Controller
         next(); 
     } catch (error) {
         return res.status(403).json({ message: "Token không hợp lệ hoặc đã hết hạn!" });

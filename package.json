@@ -5,7 +5,12 @@
   "main": "index.js",
   "scripts": {
     "dev": "node --watch src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "test": "node --test",
+    "export-data": "node src/utils/exportChunks.js",
+    "transform-ja": "node src/utils/transformJapaneseChunks.js",
+    "validate-cards": "node src/utils/validateAllCards.js",
+    "import-cards": "node src/utils/importAllCards.js"
   },
   "keywords": [],
   "author": "",
@@ -17,7 +22,6 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "mammoth": "^1.12.0",
     "mongoose": "^9.6.1",
     "nodemailer": "^9.0.4"
   }

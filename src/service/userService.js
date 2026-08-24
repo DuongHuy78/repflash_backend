@@ -28,6 +28,21 @@ export const signIn = async (username, password, timezone) => {
         throw new Error('Vui lòng nhập đầy đủ tài khoản và mật khẩu!');
     }
 
+    if (
+      typeof username !== 'string' ||
+      typeof password !== 'string' 
+    ) {
+      throw new Error('Dữ liệu đăng ký không hợp lệ.');
+    }
+
+    const normalizedUsername = username.trim();
+
+    if (!normalizedUsername || !password) {
+      throw new Error(
+        'Vui lòng nhập đầy đủ tài khoản và mật khẩu.',
+      );
+    }
+
     // 2. Tìm kiếm User trong Database
     const user = await User.findOne({ username });
 
@@ -42,10 +57,13 @@ export const signIn = async (username, password, timezone) => {
         throw new Error('Mật khẩu không chính xác!');
     }
 
+    if (user.status === 'ban') {
+        throw new Error("Tài khoản đã bị khóa. Vui lòng liên hệ hỗ trợ!");
+    }
+
     // 5. (Tùy chọn) Cập nhật thời gian lần cuối đăng nhập
     user.lastLoginAt = new Date();
     if (timezone) user.timezone = timezone;
-    await updateStreak(user._id);
     await user.save();
 
     // 6. Trả về thông tin User (Lưu ý: TUYỆT ĐỐI không trả về mật khẩu cho Frontend)
@@ -67,6 +85,19 @@ export const signUp = async (username, password, email, timezone) => {
         throw new Error('Vui lòng nhập đầy đủ thông tin!');
     }
 
+    if (
+      typeof username !== 'string' ||
+      typeof password !== 'string' ||
+      typeof email !== 'string'
+    ) {
+      throw new Error('Dữ liệu đăng ký không hợp lệ.');
+    }
+
+    username = username.trim();
+
+    if(password.length < 8) 
+      throw new Error("Mật khẩu không đủ 8 ký tự vui lòng nhập lại!");
+
     // LƯU Ý: Phải có chữ 'await' vì tìm kiếm trong Database cần thời gian chờ (bất đồng bộ)
     const existingUsername = await User.findOne({ username });
     if (existingUsername) {
@@ -86,7 +117,6 @@ export const signUp = async (username, password, email, timezone) => {
         email: email
     });
     if (timezone) newUser.timezone = timezone;
-    await newUser.save();
     await updateStreak(newUser._id);
 
     // Trả về thông tin user (loại bỏ trường password để bảo mật)

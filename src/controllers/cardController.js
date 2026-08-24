@@ -13,9 +13,9 @@ export const getAllCards = async (req, res) => {
 
 export const getDueCards = async (req, res) => {
   try {
-    const { deck = 'japanese' } = req.query;
+    const { deckId } = req.query;
     const currentUserId = req.user._id;
-    const cards = await cardService.getDueCards(deck, currentUserId);
+    const cards = await cardService.getDueCards(deckId, currentUserId);
     res.json(cards);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -24,10 +24,10 @@ export const getDueCards = async (req, res) => {
 
 export const getRetryCards = async (req, res) => {
   try {
-    const { deck = 'japanese' } = req.query;
+    const { deckId } = req.query;
     const currentUserId = req.user._id;
     
-    const cards = await cardService.getRetryCards(deck, currentUserId);
+    const cards = await cardService.getRetryCards(deckId, currentUserId);
     res.json(cards);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -36,8 +36,13 @@ export const getRetryCards = async (req, res) => {
 
 export const createCard = async (req, res) => {
   try {
-    // Đóng dấu chủ quyền: nhét userId vào trước khi tạo thẻ
-    const newCardData = { ...req.body, userId: req.user._id };
+    const { deckId, ...content } = req.body;
+    // userId luôn lấy từ JWT; deckId chỉ xác định học phần cần tạo thẻ.
+    const newCardData = {
+      ...content,
+      deckId,
+      userId: req.user._id,
+    };
     const savedCard = await cardService.createCard(newCardData);
     res.status(201).json(savedCard);
   } catch (error) {
@@ -58,9 +63,9 @@ export const editCard = async (req, res) => {
 
 export const createBulkCards = async (req, res) => {
   try {
-    const { cards, deck = 'japanese' } = req.body;
+    const { cards, deckId } = req.body;
     const currentUserId = req.user._id;
-    const result = await cardService.createBulkCards(cards, deck, currentUserId);
+    const result = await cardService.createBulkCards(cards, deckId, currentUserId);
     res.status(201).json(result);
   } catch (error) {
     res.status(400).json({ message: error.message });

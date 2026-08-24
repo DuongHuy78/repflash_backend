@@ -1,5 +1,25 @@
 import mongoose from 'mongoose';
 
+const exampleSchema = new mongoose.Schema({
+  text: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 2000,
+  },
+  translation: {
+    type: String,
+    trim: true,
+    default: '',
+  },
+  ttsText: {
+    type: String,
+    trim: true,
+    default: '',
+    maxlength: 5000,
+  },
+}, { _id: false });
+
 const flashcardSchema = new mongoose.Schema({
   userId: {
     type:  mongoose.Schema.Types.ObjectId,
@@ -8,13 +28,31 @@ const flashcardSchema = new mongoose.Schema({
   front: {
     type: String,
     required: true,
+    maxlength: 2000,
+  },
+  pronunciation: {
+    type: String,
+    default: '',
+    maxlength: 2000,
+  },
+  speechText: {
+    type: String,
+    default: '',
+    maxlength: 4000,
   },
   back: {
     type: String,
     required: true,
+    maxlength: 5000,
+  },
+  examples: {
+    type: [exampleSchema],
+    default: [],
   },
   deckId: { 
-    type: mongoose.Schema.Types.ObjectId, ref: 'Deck' 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Deck',
+    required: true 
   },
   interval: {
     type: Number,
