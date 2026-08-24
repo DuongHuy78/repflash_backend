@@ -20,7 +20,7 @@ export const register = async (req, res) => {
         const result = await userService.signUp(username, password, email, timezone);
         res.json(result);
     } catch (error) {
-        res.status(500).json("Lỗi khi đăng ký");
+        res.status(500).json("error.message");
         console.log(error.message);
     }
 }
