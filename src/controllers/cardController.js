@@ -34,6 +34,17 @@ export const getRetryCards = async (req, res) => {
   }
 };
 
+export const getNewCards = async (req, res) => {
+  try {
+    const { deckId } = req.query;
+    const currentUserId = req.user._id;
+    const result = await cardService.getNewCards(deckId, currentUserId);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 export const createCard = async (req, res) => {
   try {
     const { deckId, ...content } = req.body;
