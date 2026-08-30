@@ -160,6 +160,46 @@ export const getAllCards = async (filters, currentUserId) => {
   };
 };
 
+export const getNewCards = async (deckId, currentUserId) => {
+  const timeZone = await getUserTimezone(currentUserId);
+  const { startOfDay, endOfDay } = getDayRangeInTimeZone(new Date, timeZone);
+  await clearExpiredSameDayRetries(startOfDay, currentUserId);
+  const user = await User.findById(currentUserId);
+  if(!user) {
+    throw new Error('Không tìm thấy user hiện tại!');
+  }
+  const newCardsPerDay = Math.min(
+    100,
+    Math.max(1, Number(user.newCardsPerDay) || 20),
+  );
+  const countNewCardLearned = await Flashcard.countDocuments({
+    userId: currentUserId,
+    deckId: deckId,
+    introducedAt: { $gte: startOfDay, $lte: endOfDay },
+  });
+
+  const remaining = Math.max(0, newCardsPerDay - countNewCardLearned);
+  const newCardFilter = {
+    userId: currentUserId,
+    deckId: deckId,
+    status: 'new',
+  };
+  const totalNew = await Flashcard.countDocuments(newCardFilter);
+  const cards = remaining === 0
+    ? []
+    : await Flashcard.find(newCardFilter)
+      .sort({ createdAt: 1 })
+      .limit(remaining);
+
+  return {
+    cards,
+    limit: newCardsPerDay,
+    usedToday: countNewCardLearned,
+    remainingQuota: remaining,
+    totalNew,
+  };
+};
+
 export const getDueCards = async (deckId, currentUserId) => {
   const timeZone = await getUserTimezone(currentUserId);
   const { startOfDay, endOfDay } = getDayRangeInTimeZone(new Date, timeZone);
@@ -169,7 +209,7 @@ export const getDueCards = async (deckId, currentUserId) => {
     userId: currentUserId,
     deckId: deckId,
     nextReview: { $lte: endOfDay },
-    status: { $ne: 'mastered' },
+    status: { $nin: ['mastered', 'new'] },
     sameDayRetry: { $ne: true },
   }).sort({ nextReview: 1 });
   
@@ -297,6 +337,8 @@ export const reviewCard = async (id, qualityScore, currentUserId) => {
   const card = await Flashcard.findOne({ _id: id, userId: currentUserId });
   if (!card) throw new Error('Không tìm thấy thẻ hoặc không thuộc quyền sở hữu');
 
+  const isNewCard = card.status === 'new';
+
   let { interval, easeFactor, repetition } = card;
   let newInterval;
 
@@ -372,8 +414,12 @@ export const reviewCard = async (id, qualityScore, currentUserId) => {
   nextReviewDate.setDate(nextReviewDate.getDate() + newInterval);
   card.nextReview = nextReviewDate;
 
-  await card.save();
   const { user, newMilestone } = await updateStreak(currentUserId);
+  if(isNewCard) {
+    card.introducedAt = Date.now();
+  }
+
+  await card.save();
   return {
     card,
     newMilestone: newMilestone || null,

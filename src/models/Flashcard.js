@@ -73,8 +73,12 @@ const flashcardSchema = new mongoose.Schema({
   status: {
     type: String,
     // active thẻ bth ko phải AGAIN, learning đã bấm học lại mastered là đã thuộc, new là thẻ mới chưa học
-    enum: ['active', 'learning', 'mastered'], 
-    default: 'active',
+    enum: ['new', 'active', 'learning', 'mastered'], 
+    default: 'new',
+  },
+  introducedAt: {
+    type: Date,
+    default: null,
   },
   masteredAt: {
     type: Date,

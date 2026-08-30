@@ -8,6 +8,7 @@ router.use(verifyToken);
 // Routes
 router.get('/all', cardController.getAllCards);
 router.get('/retry', cardController.getRetryCards);
+router.get('/new', cardController.getNewCards);
 router.get('/', cardController.getDueCards);
 router.post('/', cardController.createCard);
 router.post('/bulk', cardController.createBulkCards);

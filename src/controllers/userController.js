@@ -8,7 +8,7 @@ export const login = async (req , res) => {
         const result = await userService.signIn(username, password, timezone);
         res.json(result);
     } catch (error) {
-        res.status(500).json("Lỗi khi đăng nhập");
+        res.status(500).json(error.massage);
         console.log(error.message);
     }
 }

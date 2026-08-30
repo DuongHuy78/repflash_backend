@@ -24,9 +24,9 @@ const sendPasswordResetEmail = async ({ to, resetUrl }) => {
     body: JSON.stringify({
       from,
       to: [to],
-      subject: 'Đặt lại mật khẩu Flashcard App',
+      subject: 'Đặt lại mật khẩu repflash',
       text: [
-        'Bạn đã yêu cầu đặt lại mật khẩu Flashcard App.',
+        'Bạn đã yêu cầu đặt lại mật khẩu repflash.',
         '',
         'Mở liên kết sau để tạo mật khẩu mới:',
         resetUrl,

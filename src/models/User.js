@@ -33,6 +33,10 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  newCardsPerDay: {
+    type: Number,
+    default: 20,
+  },
   currentStreak: { 
     type: Number, default: 0 
   },
