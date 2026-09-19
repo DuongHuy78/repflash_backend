@@ -1445,3 +1445,41 @@ test('ôn lần hai không đè introducedAt', async () => {
     new Date(introducedAt).getTime(),
   );
 });
+
+test('Again trên thẻ ôn lớn hơn 10 ngày', async () => {
+  const { user, card } = await createReviewFixture({
+    cardOverrides: {
+      status: 'learning',
+      interval: 11,
+      repetition: 4,
+      easeFactor: 2.5,
+    },
+  });
+
+  const result = await reviewCard(card._id, 1, user._id);
+
+  assert.equal(result.card.interval, 3);
+  assert.equal(result.card.repetition, 4);
+  assert.equal(result.card.status, 'learning');
+  assert.equal(result.card.sameDayRetry, true);
+  assert.equal(result.card.sameDayRetryCount, 1);
+});
+
+test('Hard trên thẻ ôn lớn hơn 10 ngày', async () => {
+  const { user, card } = await createReviewFixture({
+    cardOverrides: {
+      status: 'learning',
+      interval: 11,
+      repetition: 4,
+      easeFactor: 2.5,
+    },
+  });
+
+  const result = await reviewCard(card._id, 2, user._id);
+
+  assert.equal(result.card.interval, 13);
+  assert.equal(result.card.repetition, 5);
+  assert.equal(result.card.status, 'active');
+  assert.equal(result.card.sameDayRetry, false);
+  assert.equal(result.card.sameDayRetryCount, 0);
+});
