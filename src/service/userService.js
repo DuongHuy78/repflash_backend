@@ -71,7 +71,7 @@ export const signIn = async (username, password, timezone) => {
     }
 
     // 2. Tìm kiếm User trong Database
-    const user = await User.findOne({ username });
+    const user = await User.findOne({ username: normalizedUsername });
 
     // 3. Nếu không tìm thấy User
     if (!user) {
@@ -121,6 +121,7 @@ export const signUp = async (username, password, email, timezone) => {
     }
 
     username = username.trim();
+    email = email.trim().toLowerCase();
 
     if(password.length < 8) 
       throw new AppError("Mật khẩu không đủ 8 ký tự vui lòng nhập lại!", 400);
@@ -141,9 +142,9 @@ export const signUp = async (username, password, email, timezone) => {
     const newUser = await User.create({
         username: username,
         password: hashedPassword,
-        email: email
+        email: email,
+        timezone: timezone || 'Asia/Ho_Chi_Minh'
     });
-    if (timezone) newUser.timezone = timezone;
 
     // Trả về thông tin user (loại bỏ trường password để bảo mật)
     const { password: userPassword, ...userInfo } = newUser._doc;
