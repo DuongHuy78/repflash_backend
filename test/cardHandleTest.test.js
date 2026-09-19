@@ -102,7 +102,7 @@ test('từ chối quality là số âm', async () => {
       user._id,
     ),
     {
-      name: 'Error',
+      name: 'AppError',
       message: 'Điểm review không hợp lệ',
     },
   );
@@ -120,7 +120,7 @@ test('từ chối quality lớn hơn phạm vi', async () => {
       user._id,
     ),
     {
-      name: 'Error',
+      name: 'AppError',
       message: 'Điểm review không hợp lệ',
     },
   );
@@ -138,7 +138,7 @@ test('từ chối quality sai kiểu', async () => {
       user._id,
     ),
     {
-      name: 'Error',
+      name: 'AppError',
       message: 'Điểm review không hợp lệ',
     },
   );
@@ -155,7 +155,7 @@ test('không cho phép user khác review thẻ', async () => {
       otherUser._id,
     ),
     {
-      name: 'Error',
+      name: 'AppError',
       message: 'Không tìm thấy thẻ hoặc không thuộc quyền sở hữu',
     },
   );
@@ -174,7 +174,7 @@ test('editCard từ chối sửa thẻ của user khác', async () => {
       otherUser._id,
     ),
     {
-      name: 'Error',
+      name: 'AppError',
       message: 'Không tìm thấy thẻ hoặc bạn không có quyền sửa',
     },
   );
@@ -193,7 +193,7 @@ test('deleteCard từ chối xóa thẻ của user khác', async () => {
   await assert.rejects(
     () => deleteCard(card._id, otherUser._id),
     {
-      name: 'Error',
+      name: 'AppError',
       message: 'Không tìm thấy thẻ hoặc không đủ quyền',
     },
   );
@@ -411,7 +411,7 @@ test('Không tạo Card trong Deck của user khác.', async () => {
     deckId: otherDeck._id,
   }),
     {
-      name: 'Error',
+      name: 'AppError',
       message: 'Không tìm thấy học phần hoặc bạn không có quyền sử dụng học phần này',
     },
   );
@@ -436,7 +436,7 @@ test('không tạo Card khi Deck không tồn tại', async () => {
       deckId: nonexistentDeckId,
     }),
     {
-      name: 'Error',
+      name: 'AppError',
       message:
         'Không tìm thấy học phần hoặc bạn không có quyền sử dụng học phần này',
     },
@@ -466,7 +466,7 @@ test('không tạo Card khi thiếu deckId', async () => {
       // Không truyền deckId
     }),
     {
-      name: 'Error',
+      name: 'AppError',
       message: 'Hãy chọn học phần',
     },
   );
@@ -656,7 +656,7 @@ test('editCard từ chối nextReview không hợp lệ', async () => {
       user._id,
     ),
     {
-      name: 'Error',
+      name: 'AppError',
       message: 'Ngày ôn tiếp theo không hợp lệ',
     },
   );
@@ -830,7 +830,7 @@ for (const testCase of invalidBulkInputs) {
         user._id,
       ),
       {
-        name: 'Error',
+        name: 'AppError',
         message: 'Không có dữ liệu thẻ hợp lệ',
       },
     );
@@ -873,7 +873,7 @@ test('Card lỗi ở giữa làm toàn bộ bulk import thất bại', async () 
       user._id,
     ),
     {
-      name: 'Error',
+      name: 'AppError',
       message:
         'Thẻ ở dòng 3: Mặt sau không được để trống',
     },
@@ -922,7 +922,7 @@ test('bulk import từ chối khi vượt quá 500 Card', async () => {
       user._id,
     ),
     {
-      name: 'Error',
+      name: 'AppError',
       message:
         'Mỗi lần chỉ được nhập tối đa 500 thẻ',
     },
@@ -951,7 +951,7 @@ test('bulk import từ chối khi thiếu deckId', async () => {
       user._id,
     ),
     {
-      name: 'Error',
+      name: 'AppError',
       message:
         'Hãy chọn học phần trước khi nhập thẻ',
     },
@@ -982,7 +982,7 @@ test('không bulk import vào Deck của user khác', async () => {
       user._id,
     ),
     {
-      name: 'Error',
+      name: 'AppError',
       message:
         'Không tìm thấy học phần hoặc bạn không có quyền sử dụng học phần này',
     },

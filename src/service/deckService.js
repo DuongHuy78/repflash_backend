@@ -1,14 +1,16 @@
 import Deck from "../models/Deck.js";
 import Flashcard from "../models/Flashcard.js";
 import mongoose from 'mongoose';
+import { AppError } from '../errors/AppError.js';
 
 export const createDeck = async (data, currentUserId) => {
     const { deckName, description, language } = data;
     const normalizedDeckName = deckName?.trim();
 
     if (!normalizedDeckName) {
-    throw new Error(
+    throw new AppError(
         'Tên học phần không được để trống',
+        400,
     );
     }
     const newDeck = new Deck({ deckName, userId: currentUserId, description, language: language || 'ja-JP' });
@@ -24,7 +26,7 @@ export const editDeck = async (deckId, currentUserId, data) => {
     const { deckName, description, language } = data;
     const deck = await Deck.findOne({ _id: deckId, userId: currentUserId });
     
-    if (!deck) throw new Error('Không tìm thấy tập hoặc bạn không có quyền sửa');
+    if (!deck) throw new AppError('Không tìm thấy tập hoặc bạn không có quyền sửa', 404);
 
     if (deckName !== undefined) deck.deckName = deckName;
     if (description !== undefined) deck.description = description;
@@ -45,8 +47,9 @@ export const deleteDeck = async (
       }).session(session);
 
       if (!deck) {
-        throw new Error(
+        throw new AppError(
           'Không tìm thấy học phần hoặc không có quyền xóa',
+          404,
         );
       }
 
