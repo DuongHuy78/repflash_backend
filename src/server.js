@@ -7,6 +7,7 @@ import cors from 'cors';
 import cardRouter from './routers/cardRouter.js';
 import userRouter from './routers/userRouter.js';
 import deckRouter from './routers/deckRouter.js';
+import { errorMiddleware } from './middlewares/errorMiddleware.js';
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -35,6 +36,8 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+app.use(errorMiddleware);
 
 // Mọi /api/... còn lại đều là API không tồn tại
 app.use('/api', (req, res) => {

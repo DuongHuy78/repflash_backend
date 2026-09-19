@@ -1,3 +1,5 @@
+import { AppError } from '../errors/AppError.js';
+
 // 1. Chuyển đổi đối tượng Date thành chuỗi "YYYY-MM-DD" theo đúng múi giờ chỉ định
 export const getLocalDateString = (date, timeZone = 'Asia/Ho_Chi_Minh') => {
   if (!date) return null;
@@ -67,7 +69,7 @@ const zonedDateTimeToUTC = (year, month, day, hour, minute, second, millisecond,
 export const getDayRangeInTimeZone = (date = new Date(), timeZone = 'Asia/Ho_Chi_Minh') => {
   const now = new Date(date);
   if (Number.isNaN(now.getTime())) {
-    throw new Error('Ngày không hợp lệ');
+    throw new AppError('Ngày không hợp lệ', 400);
   }
 
   const today = getZonedDateTimeParts(now, timeZone);
@@ -109,13 +111,13 @@ export const isPasswordValiable = (passWord) => {
 
 const normalizeRequiredString = (value, fieldName) => {
   if (typeof value !== 'string') {
-    throw new Error(`${fieldName} phải là chuỗi`);
+    throw new AppError(`${fieldName} phải là chuỗi`, 400);
   }
 
   const normalizedValue = value.trim();
 
   if (!normalizedValue) {
-    throw new Error(`${fieldName} không được để trống`);
+    throw new AppError(`${fieldName} không được để trống`, 400);
   }
 
   return normalizedValue;
@@ -125,7 +127,7 @@ const normalizeOptionalString = (value, fieldName) => {
   if (value === undefined) return '';
 
   if (typeof value !== 'string') {
-    throw new Error(`${fieldName} phải là chuỗi`);
+    throw new AppError(`${fieldName} phải là chuỗi`, 400);
   }
 
   return value.trim();
@@ -138,7 +140,7 @@ export const normalizeCardContent = (
   { partial = false } = {},
 ) => {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    throw new Error('Dữ liệu thẻ không hợp lệ');
+    throw new AppError('Dữ liệu thẻ không hợp lệ', 400);
   }
 
   const normalized = {};
@@ -177,7 +179,7 @@ export const normalizeCardContent = (
       : data.examples;
 
     if (!Array.isArray(examples)) {
-      throw new Error('Danh sách ví dụ phải là một mảng');
+      throw new AppError('Danh sách ví dụ phải là một mảng', 400);
     }
 
     normalized.examples = examples.map((example, index) => {
@@ -186,7 +188,7 @@ export const normalizeCardContent = (
         typeof example !== 'object' ||
         Array.isArray(example)
       ) {
-        throw new Error(`Ví dụ số ${index + 1} không hợp lệ`);
+        throw new AppError(`Ví dụ số ${index + 1} không hợp lệ`, 400);
       }
 
       return {
@@ -215,7 +217,7 @@ export const parseValidDate = (value, fieldName) => {
   const parsedDate = new Date(value);
 
   if (Number.isNaN(parsedDate.getTime())) {
-    throw new Error(`${fieldName} không hợp lệ`);
+    throw new AppError(`${fieldName} không hợp lệ`, 400);
   }
 
   return parsedDate;

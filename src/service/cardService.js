@@ -4,6 +4,7 @@ import { getDayRangeInTimeZone, normalizeCardContent, parseValidDate, } from '..
 import User from '../models/User.js';
 import mongoose from 'mongoose';
 import Deck from '../models/Deck.js';
+import { AppError } from '../errors/AppError.js';
 
 const MAX_BULK_CARDS = 500;
 const MASTERED_INTERVAL_DAYS = 7;
@@ -23,11 +24,11 @@ const validateDeckAccess = async (
   currentUserId,
 ) => {
   if (!deckId) {
-    throw new Error('Hãy chọn học phần');
+    throw new AppError('Hãy chọn học phần', 400);
   }
 
   if (!mongoose.isValidObjectId(deckId)) {
-    throw new Error('Mã học phần không hợp lệ');
+    throw new AppError('Mã học phần không hợp lệ', 400);
   }
 
   const deckExists = await Deck.exists({
@@ -36,8 +37,9 @@ const validateDeckAccess = async (
   });
 
   if (!deckExists) {
-    throw new Error(
+    throw new AppError(
       'Không tìm thấy học phần hoặc bạn không có quyền sử dụng học phần này',
+      404,
     );
   }
 };
@@ -63,7 +65,7 @@ const clearExpiredSameDayRetries = async (startOfDay, userId) => {
 const getUserTimezone = async (userId) => {
   const user = await User.findById(userId).select('timezone');
   if (!user) {
-    throw new Error('Không tìm thấy người dùng');
+    throw new AppError('Không tìm thấy người dùng', 404);
   }
   return user.timezone || 'Asia/Ho_Chi_Minh';
 };
@@ -101,8 +103,9 @@ export const getAllCards = async (filters, currentUserId) => {
 
   if (parsedDateFrom && parsedDateTo) {
     if (parsedDateFrom > parsedDateTo) {
-      throw new Error(
+      throw new AppError(
         'Ngày bắt đầu không được sau ngày kết thúc',
+        400,
       );
     }
   }
@@ -166,7 +169,7 @@ export const getNewCards = async (deckId, currentUserId) => {
   await clearExpiredSameDayRetries(startOfDay, currentUserId);
   const user = await User.findById(currentUserId);
   if(!user) {
-    throw new Error('Không tìm thấy user hiện tại!');
+    throw new AppError('Không tìm thấy user hiện tại!', 404);
   }
   const newCardsPerDay = Math.min(
     100,
@@ -258,8 +261,9 @@ export const editCard = async (id, data, currentUserId) => {
   });
 
   if (!card) {
-    throw new Error(
+    throw new AppError(
       'Không tìm thấy thẻ hoặc bạn không có quyền sửa',
+      404,
     );
   }
 
@@ -278,7 +282,7 @@ export const editCard = async (id, data, currentUserId) => {
     const parsedNextReview = new Date(nextReview);
 
     if (Number.isNaN(parsedNextReview.getTime())) {
-      throw new Error('Ngày ôn tiếp theo không hợp lệ');
+      throw new AppError('Ngày ôn tiếp theo không hợp lệ', 400);
     }
 
     card.nextReview = parsedNextReview;
@@ -293,17 +297,18 @@ export const editCard = async (id, data, currentUserId) => {
 
 export const createBulkCards = async (cards, deckId, currentUserId) => {
   if (!cards || !Array.isArray(cards) || cards.length === 0) {
-    throw new Error('Không có dữ liệu thẻ hợp lệ');
+    throw new AppError('Không có dữ liệu thẻ hợp lệ', 400);
   }
 
   if (cards.length > MAX_BULK_CARDS) {
-    throw new Error(
+    throw new AppError(
       `Mỗi lần chỉ được nhập tối đa ${MAX_BULK_CARDS} thẻ`,
+      400,
     );
   }
 
   if (!deckId) {
-    throw new Error('Hãy chọn học phần trước khi nhập thẻ');
+    throw new AppError('Hãy chọn học phần trước khi nhập thẻ', 400);
   }
 
   await validateDeckAccess(deckId, currentUserId);
@@ -319,8 +324,9 @@ export const createBulkCards = async (cards, deckId, currentUserId) => {
         userId: currentUserId,
       };
     } catch (error) {
-      throw new Error(
+      throw new AppError(
         `Thẻ ở dòng ${index + 1}: ${error.message}`,
+        400,
       );
     }
   });
@@ -331,11 +337,11 @@ export const createBulkCards = async (cards, deckId, currentUserId) => {
 
 export const reviewCard = async (id, qualityScore, currentUserId) => {
   if (!Number.isInteger(qualityScore) || qualityScore < 1 || qualityScore > 4) {
-    throw new Error('Điểm review không hợp lệ');
+    throw new AppError('Điểm review không hợp lệ', 400);
   }
 
   const card = await Flashcard.findOne({ _id: id, userId: currentUserId });
-  if (!card) throw new Error('Không tìm thấy thẻ hoặc không thuộc quyền sở hữu');
+  if (!card) throw new AppError('Không tìm thấy thẻ hoặc không thuộc quyền sở hữu', 404);
 
   const isNewCard = card.status === 'new';
 
@@ -429,6 +435,6 @@ export const reviewCard = async (id, qualityScore, currentUserId) => {
 
 export const deleteCard = async (id, currentUserId) => {
   const deletedCard = await Flashcard.findOneAndDelete({ _id: id, userId: currentUserId });
-  if (!deletedCard) throw new Error('Không tìm thấy thẻ hoặc không đủ quyền');
+  if (!deletedCard) throw new AppError('Không tìm thấy thẻ hoặc không đủ quyền', 404);
   return { message: 'Đã xoá thẻ thành công' };
 };
