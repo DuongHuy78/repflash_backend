@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "test": "node --test",
+    "test": "node --test --test-concurrency=1",
     "export-data": "node src/utils/exportChunks.js",
     "transform-ja": "node src/utils/transformJapaneseChunks.js",
     "validate-cards": "node src/utils/validateAllCards.js",
