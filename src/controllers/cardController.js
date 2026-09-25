@@ -68,3 +68,11 @@ export const deleteCard = async (req, res) => {
   const result = await cardService.deleteCard(id, currentUserId);
   res.json(result);
 };
+
+export const resetCard = async (req, res) => {
+  const { id } = req.params;
+  const currentUserId = req.user._id;
+
+  const result = await cardService.resetCard(id, currentUserId);
+  res.json(result);
+};

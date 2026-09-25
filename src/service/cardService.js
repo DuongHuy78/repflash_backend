@@ -177,7 +177,6 @@ export const getNewCards = async (deckId, currentUserId) => {
   );
   const countNewCardLearned = await Flashcard.countDocuments({
     userId: currentUserId,
-    deckId: deckId,
     introducedAt: { $gte: startOfDay, $lte: endOfDay },
   });
 
@@ -253,7 +252,7 @@ export const createCard = async (data) => {
 };
 
 export const editCard = async (id, data, currentUserId) => {
- const { status, nextReview } = data;
+  const { nextReview } = data;
 
   const card = await Flashcard.findOne({
     _id: id,
@@ -274,11 +273,10 @@ export const editCard = async (id, data, currentUserId) => {
 
   Object.assign(card, contentChanges);
 
-  if (status !== undefined) {
-    card.status = status;
-  }
+  const canEditNextReview =
+    card.status === 'active' || card.status === 'learning';
 
-  if (nextReview !== undefined) {
+  if (nextReview !== undefined && canEditNextReview) {
     const parsedNextReview = new Date(nextReview);
 
     if (Number.isNaN(parsedNextReview.getTime())) {
@@ -286,10 +284,6 @@ export const editCard = async (id, data, currentUserId) => {
     }
 
     card.nextReview = parsedNextReview;
-  }
-
-  if (status === 'mastered' && !card.masteredAt) {
-    card.masteredAt = new Date();
   }
 
   return await card.save();
@@ -437,4 +431,34 @@ export const deleteCard = async (id, currentUserId) => {
   const deletedCard = await Flashcard.findOneAndDelete({ _id: id, userId: currentUserId });
   if (!deletedCard) throw new AppError('Không tìm thấy thẻ hoặc không đủ quyền', 404);
   return { message: 'Đã xoá thẻ thành công' };
+};
+
+export const resetCard = async (id, currentUserId) => {
+  const card = await Flashcard.findOne({
+    _id: id,
+    userId: currentUserId,
+  });
+
+  if (!card) {
+    throw new AppError(
+      'Không tìm thấy thẻ hoặc bạn không có quyền sửa',
+      404,
+    );
+  }
+
+  if (card.status === 'new') {
+    throw new AppError('Thẻ này đang ở hàng Từ mới.', 400);
+  }
+
+  card.status = 'new';
+  card.interval = 0;
+  card.repetition = 0;
+  card.easeFactor = 2.5;
+  card.introducedAt = null;
+  card.sameDayRetry = false;
+  card.sameDayRetryCount = 0;
+  card.masteredAt = null;
+  card.nextReview = new Date();
+
+  return await card.save();
 };

@@ -12,6 +12,7 @@ router.get('/new', cardController.getNewCards);
 router.get('/', cardController.getDueCards);
 router.post('/', cardController.createCard);
 router.post('/bulk', cardController.createBulkCards);
+router.put('/:id/reset', cardController.resetCard);
 router.put('/:id', cardController.editCard);
 router.put('/:id/review', cardController.reviewCard);
 router.delete('/:id', cardController.deleteCard);

@@ -226,8 +226,28 @@ export const getProfile = async (userId) => {
 
 export const updateProfile = async (userId, updateData) => {
 
-  const username = updateData.username?.trim();
-  const email = updateData.email?.trim().toLowerCase();
+  if (
+    typeof updateData.username !== 'string' ||
+    typeof updateData.email !== 'string'
+  ) {
+    throw new AppError('Dữ liệu cập nhật không hợp lệ.', 400);
+  }
+
+  const username = updateData.username.trim();
+  const email = updateData.email.trim().toLowerCase();
+  const newCardsPerDay = Number(updateData.newCardsPerDay);
+
+  if (!username || !email) {
+    throw new AppError('Thông tin cập nhật không đầy đủ.', 400);
+  }
+
+  if (
+    !Number.isInteger(newCardsPerDay) ||
+    newCardsPerDay < 1 ||
+    newCardsPerDay > 100
+  ) {
+    throw new AppError('Số thẻ mới mỗi ngày phải từ 1 đến 100.', 400);
+  }
 
   const user = await User.findById(userId);
 
@@ -251,6 +271,7 @@ export const updateProfile = async (userId, updateData) => {
 
   user.username = username;
   user.email = email;
+  user.newCardsPerDay = newCardsPerDay;
 
   try {
     await user.save();
@@ -265,13 +286,18 @@ export const updateProfile = async (userId, updateData) => {
     username: user.username,
     email: user.email,
     timezone: user.timezone,
+    newCardsPerDay: user.newCardsPerDay,
     updatedAt: user.updatedAt,
   };
 }
 
 export const updatePassword = async (userId, currentPassword, newPassword) => {
-  if (typeof currentPassword !== 'string' || !currentPassword) {
-    throw new AppError('Vui lòng nhập mật khẩu hiện tại.', 400);
+
+  if (
+      typeof currentPassword !== 'string' || !currentPassword ||
+      typeof newPassword !== 'string' || !newPassword
+  ) {
+      throw new AppError('Vui lòng nhập đầy đủ mật khẩu hiện tại và mật khẩu mới.', 400);
   }
 
   if (!isPasswordValiable(newPassword)) {
@@ -365,6 +391,15 @@ export const requestPasswordReset = async (email) => {
 };
 
 export const resetPassword = async (rawToken, newPassword) => {
+
+  if (typeof rawToken !== 'string' || !rawToken) {
+      throw new AppError('Link đặt lại mật khẩu không hợp lệ.', 400);
+  }
+
+  if (!isPasswordValiable(newPassword)) {
+      throw new AppError('Mật khẩu mới phải có ít nhất 8 ký tự.', 400);
+  }
+
   const tokenHash = crypto
     .createHash('sha256')
     .update(rawToken)

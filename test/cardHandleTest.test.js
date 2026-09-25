@@ -20,6 +20,7 @@ import {
   getAllCards,
   getDueCards,
   getNewCards,
+  resetCard,
   reviewCard,
 } from '../src/service/cardService.js';
 import { createReviewFixture } from './testData.js';
@@ -1112,52 +1113,53 @@ test('bulk import bỏ qua status không hợp lệ trong payload', async () => 
   assert.equal(savedCard.status, 'new');
 });
 
-test('editCard từ chối status không thuộc enum', async () => {
-  // Arrange
-  const { user, card } =
-    await createReviewFixture({
-      cardOverrides: {
-        status: 'active',
-      },
-    });
-
-  // Act + Assert lỗi Mongoose
-  await assert.rejects(
-    () => editCard(
-      card._id,
-      {
-        status: 'hacked',
-      },
-      user._id,
-    ),
-    (error) => {
-      assert.equal(
-        error.name,
-        'ValidationError',
-      );
-
-      assert.ok(error.errors.status);
-
-      assert.equal(
-        error.errors.status.kind,
-        'enum',
-      );
-
-      assert.equal(
-        error.errors.status.value,
-        'hacked',
-      );
-
-      return true;
+test('editCard bỏ qua status từ client', async () => {
+  const { user, card } = await createReviewFixture({
+    cardOverrides: {
+      status: 'new',
     },
+  });
+
+  const result = await editCard(
+    card._id,
+    {
+      front: 'mèo',
+      status: 'active',
+    },
+    user._id,
   );
 
-  // Assert database không thay đổi
-  const unchangedCard =
-    await Flashcard.findById(card._id);
+  assert.equal(result.front, 'mèo');
+  assert.equal(result.status, 'new');
 
-  assert.ok(unchangedCard);
-  assert.equal(unchangedCard.status, 'active');
+  const savedCard = await Flashcard.findById(card._id);
+  assert.equal(savedCard.status, 'new');
+  assert.equal(savedCard.front, 'mèo');
+});
+
+test('editCard bỏ qua nextReview khi thẻ new', async () => {
+  const originalNextReview = new Date('2026-01-01T00:00:00.000Z');
+  const { user, card } = await createReviewFixture({
+    cardOverrides: {
+      status: 'new',
+      nextReview: originalNextReview,
+    },
+  });
+
+  const result = await editCard(
+    card._id,
+    {
+      back: 'mèo (đã sửa)',
+      nextReview: '2026-12-31T00:00:00.000Z',
+    },
+    user._id,
+  );
+
+  assert.equal(result.back, 'mèo (đã sửa)');
+  assert.equal(
+    new Date(result.nextReview).getTime(),
+    originalNextReview.getTime(),
+  );
 });
 
 test('getDueCards không đưa thẻ new vào ôn tập', async () => {
@@ -1286,7 +1288,7 @@ test('getNewCards trừ suất đã mở hôm nay', async () => {
   assert.equal(result.totalNew, 3);
 });
 
-test('getNewCards đếm suất theo từng học phần', async () => {
+test('getNewCards đếm suất theo tài khoản, không theo từng học phần', async () => {
   const { user, deck } = await createReviewFixture({
     userOverrides: { newCardsPerDay: 1 },
   });
@@ -1307,7 +1309,7 @@ test('getNewCards đếm suất theo từng học phần', async () => {
     introducedAt: new Date(),
   });
 
-  const deckBNew = await Flashcard.create({
+  await Flashcard.create({
     front: 'deck B mới',
     back: 'b',
     userId: user._id,
@@ -1317,11 +1319,10 @@ test('getNewCards đếm suất theo từng học phần', async () => {
 
   const result = await getNewCards(otherDeck._id, user._id);
 
-  assert.equal(result.cards.length, 1);
-  assert.equal(result.cards[0]._id.toString(), deckBNew._id.toString());
+  assert.equal(result.cards.length, 0);
   assert.equal(result.limit, 1);
-  assert.equal(result.usedToday, 0);
-  assert.equal(result.remainingQuota, 1);
+  assert.equal(result.usedToday, 1);
+  assert.equal(result.remainingQuota, 0);
   assert.equal(result.totalNew, 1);
 });
 
@@ -1378,6 +1379,54 @@ test('getNewCards hết suất vẫn trả totalNew', async () => {
   assert.equal(result.usedToday, 1);
   assert.equal(result.remainingQuota, 0);
   assert.equal(result.totalNew, 1);
+});
+
+test('resetCard đưa thẻ về new và xóa tiến độ SM-2', async () => {
+  const { user, card } = await createReviewFixture({
+    cardOverrides: {
+      status: 'active',
+      interval: 12,
+      repetition: 4,
+      easeFactor: 2.8,
+      introducedAt: new Date(),
+      sameDayRetry: true,
+      sameDayRetryCount: 2,
+      masteredAt: new Date(),
+      nextReview: new Date('2026-12-01T00:00:00.000Z'),
+    },
+  });
+
+  const result = await resetCard(card._id, user._id);
+
+  assert.equal(result.status, 'new');
+  assert.equal(result.interval, 0);
+  assert.equal(result.repetition, 0);
+  assert.equal(result.easeFactor, 2.5);
+  assert.equal(result.introducedAt, null);
+  assert.equal(result.sameDayRetry, false);
+  assert.equal(result.sameDayRetryCount, 0);
+  assert.equal(result.masteredAt, null);
+
+  const savedCard = await Flashcard.findById(card._id);
+  assert.equal(savedCard.status, 'new');
+  assert.equal(savedCard.interval, 0);
+  assert.equal(savedCard.sameDayRetryCount, 0);
+});
+
+test('resetCard từ chối thẻ đang new', async () => {
+  const { user, card } = await createReviewFixture({
+    cardOverrides: {
+      status: 'new',
+    },
+  });
+
+  await assert.rejects(
+    () => resetCard(card._id, user._id),
+    {
+      name: 'AppError',
+      message: 'Thẻ này đang ở hàng Từ mới.',
+    },
+  );
 });
 
 test('Again trên thẻ new đưa vào bò nhai cỏ và gán introducedAt', async () => {
