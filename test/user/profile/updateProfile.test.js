@@ -8,14 +8,14 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import User from '../src/models/User.js';
-import { updateProfile } from '../src/service/userService.js';
+import User from '../../../src/models/User.js';
+import { updateProfile } from '../../../src/service/userService.js';
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirectory = path.dirname(currentFilePath);
 
 dotenv.config({
-  path: path.resolve(currentDirectory, '../../.env'),
+  path: path.resolve(currentDirectory, '../../../../.env'),
 });
 
 const createProfileUser = async (overrides = {}) => {
@@ -238,7 +238,6 @@ test('newCardsPerDay bằng 1 thì lưu được', async () => {
   assert.equal(savedUser.username, user.username);
   assert.equal(savedUser.email, user.email);
 });
-
 test('newCardsPerDay bằng 100 thì lưu được', async () => {
   const user = await createProfileUser();
 

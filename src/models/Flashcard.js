@@ -98,10 +98,9 @@ const flashcardSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-flashcardSchema.index({ status: 1, nextReview: 1 });
-flashcardSchema.index({ status: 1 });
-flashcardSchema.index({ nextReview: 1 });
-flashcardSchema.index({ lastReviewedAt: 1 });
-flashcardSchema.index({ deckId: 1 });
+flashcardSchema.index({ userId: 1, deckId: 1, createdAt: -1 });
+flashcardSchema.index({ userId: 1, deckId: 1, status: 1, createdAt: 1 });
+flashcardSchema.index({ userId: 1, deckId: 1, nextReview: 1 });
+flashcardSchema.index({ userId: 1, introducedAt: 1 });
 
 export default mongoose.model('Flashcard', flashcardSchema);

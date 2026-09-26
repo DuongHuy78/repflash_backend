@@ -161,11 +161,13 @@ export const signUp = async (username, password, email, timezone) => {
  * việc Frontend tự xóa Token đã là quá đủ bảo mật rồi
  */
 
-export const updateStreak = async (userId) => {
+export const updateStreak = async (userId, session = null) => {
   const MILESTONES = [3, 7, 14, 30, 60, 200];
 
-  const user = await User.findById(userId);
-  if (!user) return;
+  const user = await User.findById(userId).session(session);
+  if (!user) {
+    throw new AppError('Không tìm thấy người dùng', 404);
+  }
 
   const now = new Date();
   const timeZone = user.timezone || 'Asia/Ho_Chi_Minh';
@@ -212,7 +214,7 @@ export const updateStreak = async (userId) => {
   }
 
   user.lastStudyDate = now;
-  await user.save();
+  await user.save({ session });
   return {
     user,
     newMilestone: newMilestoneUnlocked // Trả về null nếu không đạt mốc mới

@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 
-import User from '../src/models/User.js';
-import Deck from '../src/models/Deck.js';
-import Flashcard from '../src/models/Flashcard.js';
+import User from '../../src/models/User.js';
+import Deck from '../../src/models/Deck.js';
+import Flashcard from '../../src/models/Flashcard.js';
 
 export const createReviewFixture = async ({
     userOverrides = {},

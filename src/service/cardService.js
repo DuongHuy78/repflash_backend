@@ -334,97 +334,113 @@ export const reviewCard = async (id, qualityScore, currentUserId) => {
     throw new AppError('Điểm review không hợp lệ', 400);
   }
 
-  const card = await Flashcard.findOne({ _id: id, userId: currentUserId });
-  if (!card) throw new AppError('Không tìm thấy thẻ hoặc không thuộc quyền sở hữu', 404);
+  return mongoose.connection.transaction(async (session) => {
+    const card = await Flashcard.findOne({
+      _id: id,
+      userId: currentUserId,
+    }).session(session);
 
-  const isNewCard = card.status === 'new';
-
-  let { interval, easeFactor, repetition } = card;
-  let newInterval;
-
-  if (qualityScore === 4 && interval > MASTERED_INTERVAL_DAYS) {
-    card.status = 'mastered';
-    card.masteredAt = new Date();
-    console.log('Thẻ đã đánh dấu thuộc '+ id);
-    await card.save();
-    const { user, newMilestone } = await updateStreak(currentUserId);
-
-    return {
-      mastered: true,
-      cardId: id,
-      message: 'Thẻ đã được đánh dấu là đã thuộc.',
-      newMilestone: newMilestone || null,
-      currentStreak: user?.currentStreak || 0
-    };
-  }
-      
-  // 1. Ánh xạ Quality của UI (1-4) sang SM-2 (0-5) để tránh lỗi "Ease Hell"
-  let q;
-  if (qualityScore === 4) q = 5;      // Dễ -> Hoàn hảo
-  else if (qualityScore === 3) q = 4; // Tốt -> Nhớ được
-  else if (qualityScore === 2) q = 3; // Khó -> Nhớ khó khăn
-  else q = 1;                    // Lại -> Sai/Quên
-
-  let newEase = easeFactor + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02));
-
-  // Thuật toán tối ưu cho lượng từ vựng lớn
-  if (qualityScore < 2) {
-    // 2. Chống Reset hoàn toàn (Lapse Multiplier)
-    // Nếu thẻ đã học lâu (interval > 10 ngày), thay vì rớt xuống 1 ngày, ta giảm còn 30%
-    if (interval > 10) {
-      newInterval = Math.max(1, Math.round(interval * 0.3));
-    } else {
-      newInterval = 1; // Again
-      repetition = 0; // Reset số lần nếu thẻ còn mới
+    if (!card) {
+      throw new AppError(
+        'Không tìm thấy thẻ hoặc không thuộc quyền sở hữu',
+        404,
+      );
     }
-  } else {
-    if (repetition === 0) {
-      newInterval = 1;
-    } else if (repetition === 1) {
-      newInterval = 6;
+
+    const now = new Date();
+    const isNewCard = card.status === 'new';
+    const shouldMaster =
+      qualityScore === 4 && card.interval > MASTERED_INTERVAL_DAYS;
+
+    if (shouldMaster) {
+      card.status = 'mastered';
+      card.masteredAt = now;
+      console.log('Thẻ đã đánh dấu thuộc ' + id);
     } else {
-      if (qualityScore === 2) {
-        newInterval = Math.max(1, Math.round(interval * 1.2)); // Hard
-      } else if (qualityScore === 3) {
-        newInterval = Math.max(1, Math.round(interval * newEase)); // Good
+      let { interval, easeFactor, repetition } = card;
+      let newInterval;
+
+      // 1. Ánh xạ Quality của UI (1-4) sang SM-2 (0-5) để tránh lỗi "Ease Hell"
+      let q;
+      if (qualityScore === 4) q = 5;      // Dễ -> Hoàn hảo
+      else if (qualityScore === 3) q = 4; // Tốt -> Nhớ được
+      else if (qualityScore === 2) q = 3; // Khó -> Nhớ khó khăn
+      else q = 1;                         // Lại -> Sai/Quên
+
+      const newEase = easeFactor + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02));
+
+      // Thuật toán tối ưu cho lượng từ vựng lớn
+      if (qualityScore < 2) {
+        // 2. Chống Reset hoàn toàn (Lapse Multiplier)
+        // Nếu thẻ đã học lâu (interval > 10 ngày), thay vì rớt xuống 1 ngày, ta giảm còn 30%
+        if (interval > 10) {
+          newInterval = Math.max(1, Math.round(interval * 0.3));
+        } else {
+          newInterval = 1; // Again
+          repetition = 0; // Reset số lần nếu thẻ còn mới
+        }
       } else {
-        newInterval = Math.max(1, Math.round(interval * newEase * 1.3)); // Easy
+        if (repetition === 0) {
+          newInterval = 1;
+        } else if (repetition === 1) {
+          newInterval = 6;
+        } else if (qualityScore === 2) {
+          newInterval = Math.max(1, Math.round(interval * 1.2)); // Hard
+        } else if (qualityScore === 3) {
+          newInterval = Math.max(1, Math.round(interval * newEase)); // Good
+        } else {
+          newInterval = Math.max(1, Math.round(interval * newEase * 1.3)); // Easy
+        }
+        repetition += 1;
+      }
+
+      // Cập nhật thẻ
+      card.interval = newInterval;
+      card.easeFactor = Math.max(1.3, newEase); // easeFactor không nên nhỏ hơn 1.3
+      card.repetition = repetition;
+      card.lastReviewedAt = now;
+
+      if (qualityScore === 1) {
+        card.status = 'learning';
+        card.sameDayRetry = true;
+        card.sameDayRetryCount = (card.sameDayRetryCount || 0) + 1;
+      } else {
+        card.status = 'active';
+        card.sameDayRetry = false;
+      }
+
+      // Tính toán ngày học tiếp theo
+      const nextReviewDate = new Date(now);
+      nextReviewDate.setDate(nextReviewDate.getDate() + newInterval);
+      card.nextReview = nextReviewDate;
+
+      if (isNewCard) {
+        card.introducedAt = now;
       }
     }
-    repetition += 1;
-  }
 
-  // Cập nhật thẻ
-  card.interval = newInterval;
-  card.easeFactor = Math.max(1.3, newEase); // easeFactor không nên nhỏ hơn 1.3
-  card.repetition = repetition;
-  card.lastReviewedAt = new Date();
+    await card.save({ session });
+    const { user, newMilestone } = await updateStreak(
+      currentUserId,
+      session,
+    );
 
-  if (qualityScore === 1) {
-    card.status = 'learning';
-    card.sameDayRetry = true;
-    card.sameDayRetryCount = (card.sameDayRetryCount || 0) + 1;
-  } else {
-    card.status = 'active';
-    card.sameDayRetry = false;
-  }
+    if (shouldMaster) {
+      return {
+        mastered: true,
+        cardId: id,
+        message: 'Thẻ đã được đánh dấu là đã thuộc.',
+        newMilestone: newMilestone || null,
+        currentStreak: user.currentStreak,
+      };
+    }
 
-  // Tính toán ngày học tiếp theo
-  const nextReviewDate = new Date();
-  nextReviewDate.setDate(nextReviewDate.getDate() + newInterval);
-  card.nextReview = nextReviewDate;
-
-  const { user, newMilestone } = await updateStreak(currentUserId);
-  if(isNewCard) {
-    card.introducedAt = Date.now();
-  }
-
-  await card.save();
-  return {
-    card,
-    newMilestone: newMilestone || null,
-    currentStreak: user?.currentStreak || 0
-  };
+    return {
+      card,
+      newMilestone: newMilestone || null,
+      currentStreak: user.currentStreak,
+    };
+  });
 };
 
 export const deleteCard = async (id, currentUserId) => {

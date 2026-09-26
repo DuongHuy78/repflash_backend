@@ -8,21 +8,21 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import User from '../src/models/User.js';
-import Deck from '../src/models/Deck.js';
-import Flashcard from '../src/models/Flashcard.js';
+import User from '../../../src/models/User.js';
+import Deck from '../../../src/models/Deck.js';
+import Flashcard from '../../../src/models/Flashcard.js';
 import bcrypt from 'bcryptjs';
 
 import { 
     updatePassword 
- } from "../src/service/userService.js";
-import { createReviewFixture } from './testData.js';
+ } from "../../../src/service/userService.js";
+import { createReviewFixture } from '../../support/testData.js';
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirectory = path.dirname(currentFilePath);
 
 dotenv.config({
-    path: path.resolve(currentDirectory, '../../.env'),
+    path: path.resolve(currentDirectory, '../../../../.env'),
 });
 
 

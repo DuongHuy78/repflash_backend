@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   normalizeCardContent,
-} from '../src/utils/utlils.js';
+} from '../../../src/utils/utlils.js';
 
 test('chuẩn hóa nội dung khi tạo card', () => {
     // Arrange: chuẩn bị dữ liệu
